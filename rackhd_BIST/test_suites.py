@@ -86,8 +86,8 @@ class RackhdServices(object):
             self.__operate_user_rackhd(operator)
         else:
             self.__operate_regular_rackhd(operator)
-        description = "RackHD services {}ed".format(operator)
-        Logger.record_log_message(description, "info", "")
+        #description = "{} RackHD services".format(operator.capitalize())
+        #Logger.record_log_message(description, "info", "")
 
     def start_rackhd_services(self):
         """
@@ -135,7 +135,7 @@ class RackhdServices(object):
         connection.add_timeout(self.amqp_connect_timeout, self.__amqp_timeout_callback)
         self.amqp_connection["channel"] = channel
         self.amqp_connection["connection"] = connection
-        print "Waiting for RackHD services heartbeat signals..."
+        # print "Waiting for RackHD services heartbeat signals..."
         try:
             for method_frame, properties, body in channel.consume(queue_name):
                 channel.basic_ack(method_frame.delivery_tag)
@@ -237,9 +237,13 @@ class RequiredServices(object):
                     subnet_match = match.groups()
                     self.dhcp_ip_range["start_ip"] = subnet_match[1]
                     self.dhcp_ip_range["end_ip"] = subnet_match[2]
-        for value in unconfig_keys:
-            description = "RackHD required dhcpd configure {} is incorrect".format(value)
-            Logger.record_log_message(description, "error", "")
+        if not unconfig_keys:
+            description = "RackHD required dhcpd configure is correct"
+            Logger.record_log_message(description, "debug", "")
+        else:
+            for value in unconfig_keys:
+                description = "RackHD required dhcpd configure {} is incorrect".format(value)
+                Logger.record_log_message(description, "error", "")
 
     def run_test(self):
         """
@@ -262,8 +266,8 @@ class RackhdConfigure(object):
                 "unequal": "warning"
             },
             "optional": {
-                "missing": "info",
-                "unequal": "debug"
+                "missing": "warning",
+                "unequal": "info"
             }
         }
         self.config_file_paths = CONFIGURATION.get("configFile")
@@ -318,6 +322,9 @@ class RackhdConfigure(object):
                 details = ''
                 Logger.record_log_message(
                     description, self.log_level[template_key]["unequal"], details)
+            else:
+                description = "Check RackHD configuration item {}".format(key)
+                Logger.record_log_message(description, 'debug', '')
 
     def validate_config_items(self):
         """
@@ -332,7 +339,7 @@ class RackhdConfigure(object):
         """
         for key in self.unchecked_configs:
             description = "Configuration item {} is specified".format(key)
-            details = "{}: {}".format(key, self.rackhd_config.get(key))
+            details = '{}: {}'.format(key, self.rackhd_config.get(key))
             Logger.record_log_message(description, "info", details)
 
     def run_test(self):
@@ -392,14 +399,14 @@ class Tools(object):
             cmd = tool.get("getVersionCommand", [tool_name, "--version"])
             redirect_flag = tool.get("redirect", False)  # Flag for redirecting stderr to stdout
             isRequired = tool.get("isRequired", True) # By default tool is required
-            description = "Get version for tool {}".format(tool_name)
+            description = "Got version for tool {}".format(tool_name)
             version_info = utils.get_tool_version(cmd, redirect_flag)
             if version_info["exit_code"] == 0:
                 version_requirement = tool.get("version", {})
                 is_valid = self.validate_requirement(version_requirement, version_info["message"])
                 if not is_valid:
                     version_info["exit_code"] == -1
-                    version_info["message"] == "Tool version is invalid"
+                    version_info["message"] == "Tool {} version is invalid".format(tool_name)
             if isRequired:
                 level = "error"
             else:
@@ -435,12 +442,13 @@ class StaticFiles(object):
             file_path = os.path.join(self.source_code_path, file_obj.get("dirPath", ""))
             file_list = file_obj.get("fileList", [])
             for file_name in file_list:
+                details = ''
                 description = "Check existence of file {}".format(file_name)
                 file_name = os.path.join(file_path, file_name)
                 if os.path.isfile(file_name):
                     level = "debug"
-                    description += " succeeded"
-                    details = "File {} exists".format(file_name)
+                    #description += " succeeded"
+                    #details = "File {} exists".format(file_name)
                 else:
                     level = log_level
                     description += " failed"
@@ -545,7 +553,8 @@ class HardwareResource(object):
         for info in info_list:
             info = info.split(":")
             cpu_info[info[0].strip(" ")] = info[-1].strip(" ")
-        description = "RackHD server CPU info: {}".format(str(cpu_info))
+        description = "RackHD server CPU info: {} cores, {}MHz,".format(
+            cpu_info["CPU(s)"], cpu_info["CPU MHz"])
         Logger.record_log_message(description, "debug", "")
         return cpu_info
 
@@ -565,7 +574,7 @@ class HardwareResource(object):
         mem_info = {}
         for title, data in zip(title_list, data_list):
             mem_info[title] = data
-        description = "RackHD server memory info: {}".format(str(mem_info))
+        description = "RackHD server memory size: {}".format(mem_info["total"])
         Logger.record_log_message(description, "info", "")
         return mem_info
 

@@ -28,7 +28,6 @@ def get_configurations():
     if user_bist_config["exit_code"]:
         print user_bist_config["message"]
         sys.exit(-1)
-    print "Load BIST configuration files successfully"
 
     #user_bist_config can override rackhd_bist_config
     return dict(rackhd_bist_config["message"], **user_bist_config["message"])
@@ -119,7 +118,7 @@ def initiate_logger(name, path):
     logfile = logging.FileHandler(logfile_name)
     console = logging.StreamHandler()
     logfile.setLevel(logging.DEBUG)  # Log file will record all messages
-    console.setLevel(logging.WARNING)  # Console will report WARNNING and ERROR
+    console.setLevel(logging.DEBUG)  # Console will report WARNNING and ERROR
     formatter = logging.Formatter(
         '[%(levelname)-7s][%(asctime)-15s] %(message)s'
     )
@@ -177,6 +176,29 @@ class Logger(object):
         self.name = "rackhd_bist_log"
         self.path = os.path.join(os.getcwd(), "log/")
         self.logger = initiate_logger(self.name, self.path)
+        self.color_map = {
+            "warning": "\033[93m", # yellow
+            "error": "\033[91m", # red
+            "debug": "\033[92m", # green
+            "info": "\033[92m", # green
+            "details": "\033[90m", # grey
+            "title": "\033[1m", # bold
+            "end": "\033[0m" # end
+        }
+
+    def print_class_name(self, name):
+        """
+        Print class name
+        """
+        log_message = '{0}{1}{2}'.format(self.color_map["title"], name, self.color_map["end"])
+        print log_message
+
+    def create_colored_log(self, log, color):
+        """
+        Print class name
+        """
+        colored_log = '{0}{1}{2}'.format(color, log, self.color_map["end"])
+        return colored_log
 
     def record_log_message(self, description, level, details):
         """
@@ -187,9 +209,15 @@ class Logger(object):
         """
         assert level in ["info", "warning", "error", "debug"], "Logging level is incorrect"
         assert isinstance(description, str), "Log description should be a string"
-        log_message = '[message]: {}  '.format(description)
+        log_message = "  " + description  # 2 space indent
         if details:
-            log_message = log_message + '[details]: {}'.format(details)
+            if level == "warning" or level == "error":
+                details = "     " + details  # 4 space indents
+                details = self.create_colored_log(details, self.color_map["details"])
+                log_message = log_message + "\n" + details
+            else:
+                log_message = log_message + ": " + details
+        log_message = self.create_colored_log(log_message, self.color_map[level])
         logger_method = getattr(self.logger, level)
         logger_method(log_message)
 
@@ -205,7 +233,7 @@ class Logger(object):
         details = status["message"].strip("\n")
         if status["exit_code"] == 0:
             level = 'debug'
-            description = description + " succeeded"
+            #description = description + " succeeded"
         else:
             description = description + " failed"
         self.record_log_message(description, level, details)
